@@ -1,0 +1,16 @@
+{
+  "paymentMethod": "Metode Pembayaran",
+  "choosePaymentOption": "Pilih metode pembayaran",
+  "orderSummary": "Ringkasan Pesanan",
+  "yourName": "Nama Anda",
+  "whatsappNumber": "Nomor WhatsApp",
+  "continuePayment": "Lanjutkan Pembayaran",
+  "payAtCashier": "Bayar di Kasir",
+  "transferPayment": "Bayar dengan Transfer",
+  "loadingOrder": "Memuat detail pesanan...",
+  "errorOccurred": "Ups! Terjadi kesalahan",
+  "retry": "Coba Lagi",
+  "goToCashier": "Datang ke kasir untuk menyelesaikan pembayaran",
+  "transferNow": "Bayar sekarang via transfer dari meja Anda",
+  "pleaseEnterName": "Silakan masukkan nama Anda"
+}

@@ -1,0 +1,16 @@
+{
+  "paymentMethod": "Payment Method",
+  "choosePaymentOption": "Choose your payment option",
+  "orderSummary": "Order Summary",
+  "yourName": "Your Name",
+  "whatsappNumber": "WhatsApp Number",
+  "continuePayment": "Continue Payment",
+  "payAtCashier": "Pay at Cashier",
+  "transferPayment": "Transfer Payment",
+  "loadingOrder": "Loading order details...",
+  "errorOccurred": "Oops! Something went wrong",
+  "retry": "Try Again",
+  "goToCashier": "Go to cashier counter to complete payment",
+  "transferNow": "Pay now via bank transfer from your table",
+  "pleaseEnterName": "Please enter your name"
+}

@@ -1,0 +1,19 @@
+/* assets/css/theme.css */
+:root {
+  --theme-from: #cdddd7;
+  --theme-via: #0d9488;
+  --theme-to: #06b6d4;
+}
+
+.theme-gradient {
+  background-image: linear-gradient(to bottom right,
+      var(--theme-from),
+      var(--theme-via),
+      var(--theme-to));
+}
+
+.theme-text-gradient {
+  background-image: linear-gradient(to right, var(--theme-from), var(--theme-to));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}

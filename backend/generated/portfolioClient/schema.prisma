@@ -1,0 +1,491 @@
+// 📦 Generator for Portfolio Client
+generator portfolioClient {
+  provider        = "prisma-client-js"
+  output          = "../generated/portfolioClient"
+  previewFeatures = ["multiSchema"]
+}
+
+// 📦 Generator for POS Client
+generator posClient {
+  provider        = "prisma-client-js"
+  output          = "../generated/posClient"
+  previewFeatures = ["multiSchema"]
+}
+
+// ✅ ONE datasource only — with both schemas
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["portfolio", "pos_coffee_shop"]
+}
+
+// Your models below (with @@schema annotations)
+
+// You can keep all your models in this one file.
+// Make sure each model has @@schema("portfolio") or @@schema("pos_coffee_shop")
+
+/////////////////////////
+// 📁 Schema: portfolio
+/////////////////////////
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  createdAt DateTime @default(now())
+
+  @@schema("portfolio")
+}
+
+model Project {
+  id          Int      @id @default(autoincrement())
+  title       String
+  slug        String   @unique
+  description String
+  content     String?
+  imageUrl    String
+  images      Json?
+  link        String
+  repo        String?
+  tags        Json
+  createdAt   DateTime @default(now())
+
+  views ViewLog[] @relation("ProjectViews")
+
+  @@schema("portfolio")
+}
+
+model ViewLog {
+  id          Int      @id @default(autoincrement())
+  projectSlug String
+  deviceId    String
+  ip          String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  project Project @relation("ProjectViews", fields: [projectSlug], references: [slug])
+
+  @@index([projectSlug, deviceId, createdAt])
+  @@schema("portfolio")
+}
+
+///////////////////////
+// ☕ Schema: pos_coffee_shop
+///////////////////////
+enum AdminRole {
+  OWNER
+  MANAGER
+  CASHIER
+  STALL_OWNER // 👈 NEW: For individual stall operators
+
+  @@schema("pos_coffee_shop")
+}
+
+model AdminUser {
+  id        String          @id @default(uuid())
+  email     String          @unique
+  password  String
+  name      String?
+  merchants AdminMerchant[]
+  createdAt DateTime        @default(now())
+  lastLogin DateTime?
+
+  @@schema("pos_coffee_shop")
+}
+
+model AdminMerchant {
+  id         String    @id @default(uuid())
+  adminId    String
+  merchantId String
+  role       AdminRole @default(OWNER) // 👈 changed from String to Enum
+  stallId    String?
+  createdAt  DateTime  @default(now())
+
+  admin    AdminUser @relation(fields: [adminId], references: [id])
+  merchant Merchant  @relation(fields: [merchantId], references: [id])
+  stall    Stall?    @relation(fields: [stallId], references: [id]) // 👈 NEW relation
+
+  @@unique([adminId, merchantId, stallId])
+  @@schema("pos_coffee_shop")
+}
+
+model Stall {
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+
+  merchantId String
+  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  active        Boolean   @default(true)
+  setupComplete Boolean   @default(false)
+  lastLogin     DateTime?
+
+  // Relations
+  schedules  StallSchedule[] // default weekly open/close
+  overrides  StallOverride[] // one-off special days
+  admins     AdminMerchant[]
+  menuItems  MenuItem[]
+  orderItems OrderItem[]
+  images     Image[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("pos_coffee_shop")
+}
+
+model StallSchedule {
+  id      String @id @default(uuid())
+  stallId String
+  stall   Stall  @relation(fields: [stallId], references: [id], onDelete: Cascade)
+
+  dayOfWeek Int // 0 = Sunday, 1 = Monday ... 6 = Saturday
+  openHour  String // "09:00"
+  closeHour String // "21:00"
+  closed    Boolean @default(false) // true = weekly off
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("pos_coffee_shop")
+}
+
+model StallOverride {
+  id      String @id @default(uuid())
+  stallId String
+  stall   Stall  @relation(fields: [stallId], references: [id], onDelete: Cascade)
+
+  date   DateTime // specific date (YYYY-MM-DD)
+  isOpen Boolean // true = force open, false = force closed
+  note   String? // reason or message for staff
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("pos_coffee_shop")
+}
+
+model Merchant {
+  id   String @id @default(uuid())
+  name String
+  slug String @unique
+
+  images         Image[]
+  themeColor     String?
+  subCategories  SubCategory[] // ✅ Fixes relation error
+  menuItems      MenuItem[]
+  tables         Table[]
+  orders         Order[]
+  admins         AdminMerchant[] // 👈 Add this line
+  stalls         Stall[]
+  paymentOptions PaymentMethodOption[] // ✅ replaces old enum[]
+  createdAt      DateTime              @default(now())
+
+  menuVariantTypes MenuVariantType[]
+
+  @@schema("pos_coffee_shop")
+}
+
+enum PaymentCategory {
+  CASH
+  QRIS
+  BANK
+  EDC
+  FREE
+
+  @@schema("pos_coffee_shop")
+}
+
+model PaymentMethodOption {
+  id            String          @id @default(uuid())
+  name          String // e.g. "BANK BCA", "QRIS LinkAja"
+  type          PaymentCategory
+  merchant      Merchant        @relation(fields: [merchantId], references: [id])
+  merchantId    String
+  accountName   String? // optional if needed
+  accountNumber String? // optional
+  images        Image[]         @relation("PaymentMethodOptionImages")
+
+  orders Order[] // reverse relation
+
+  @@schema("pos_coffee_shop")
+}
+
+model Image {
+  id        String   @id @default(cuid())
+  url       String
+  storage   String // 'local', 'cloudinary', 's3', etc.
+  type      String // 'logo', 'cover', 'gallery', qrpayment etc.
+  createdAt DateTime @default(now())
+
+  merchantId String?
+  merchant   Merchant? @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  stallId String?
+  stall   Stall?  @relation(fields: [stallId], references: [id])
+
+  // ✅ Relasi balik ke MenuItem
+  menuItemId String?
+  menuItem   MenuItem? @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  orderId String?
+  order   Order?  @relation("OrderImages", fields: [orderId], references: [id])
+
+  paymentMethodOptionId String?
+  paymentMethodOption   PaymentMethodOption? @relation("PaymentMethodOptionImages", fields: [paymentMethodOptionId], references: [id], onDelete: Cascade)
+
+  @@schema("pos_coffee_shop")
+}
+
+model Table {
+  id         String   @id @default(uuid())
+  name       String // e.g. A1, B2
+  merchantId String
+  merchant   Merchant @relation(fields: [merchantId], references: [id])
+  orders     Order[]
+
+  @@schema("pos_coffee_shop")
+}
+
+model MenuItem {
+  id            String       @id @default(uuid())
+  name          String
+  price         Int
+  description   String?
+  available     Boolean      @default(true)
+  category      MenuCategory
+  subCategoryId String?
+  subCategory   SubCategory? @relation(fields: [subCategoryId], references: [id])
+
+  merchantId String
+  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  images     Image[]
+  orderItems OrderItem[]
+  favorites  FavoriteMenuItem[]
+
+  stallId String? // 👈 NEW: NULL = merchant-wide, set = stall-specific
+  stall   Stall?  @relation(fields: [stallId], references: [id], onDelete: Cascade)
+
+  menuVariants MenuVariant[] // ✅ Relasi ke varian (bisa kosong)
+  deletedAt    DateTime?
+
+  @@schema("pos_coffee_shop")
+}
+
+enum MenuCategory {
+  FOOD
+  DRINK
+  SNACK
+
+  @@schema("pos_coffee_shop")
+}
+
+model SubCategory {
+  id         String       @id @default(uuid())
+  name       String
+  category   MenuCategory
+  merchantId String
+  merchant   Merchant     @relation(fields: [merchantId], references: [id])
+  menuItems  MenuItem[]
+
+  @@unique([name, merchantId, category]) // prevent duplicate subcategory per merchant
+  @@schema("pos_coffee_shop")
+}
+
+// ==========================
+// VARIANT TYPE (opsional)
+// ==========================
+model MenuVariantType {
+  id         String   @id @default(uuid())
+  name       String // Contoh: "Temperature", "Size"
+  merchantId String
+  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  options   MenuVariant[]
+  deletedAt DateTime?
+
+  @@unique([name, merchantId])
+  @@schema("pos_coffee_shop")
+}
+
+model MenuVariant {
+  id         String @id @default(uuid())
+  name       String // Contoh: "Hot", "Ice", "Large"
+  extraPrice Int    @default(0)
+
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  variantTypeId String?
+  variantType   MenuVariantType? @relation(fields: [variantTypeId], references: [id], onDelete: SetNull)
+
+  deletedAt DateTime?
+
+  orderItemVariants OrderItemVariant[] // relasi balik ke order
+
+  @@unique([name, menuItemId, variantTypeId])
+  @@schema("pos_coffee_shop")
+}
+
+model Customer {
+  id        String             @id @default(uuid())
+  phone     String             @unique
+  name      String?
+  orders    Order[]
+  points    Int                @default(0)
+  favorites FavoriteMenuItem[]
+  lastLogin DateTime?
+  createdAt DateTime           @default(now())
+
+  @@schema("pos_coffee_shop")
+}
+
+model FavoriteMenuItem {
+  id         String   @id @default(uuid())
+  customerId String
+  menuItemId String
+  count      Int      @default(1)
+  customer   Customer @relation(fields: [customerId], references: [id])
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+
+  @@schema("pos_coffee_shop")
+}
+
+model Order {
+  id String @id @default(uuid())
+
+  // Optional customer
+  customerId   String?
+  customer     Customer? @relation(fields: [customerId], references: [id])
+  customerName String?
+
+  // Payment & status
+  status          OrderStatus          @default(PENDING)
+  paymentMethodId String?
+  paymentMethod   PaymentMethodOption? @relation(fields: [paymentMethodId], references: [id])
+  paid            Boolean              @default(false)
+
+  // Pricing breakdown (calculated by backend)
+  subtotal       Int // Total item price before anything
+  discountAmount Int @default(0) // Flat discount
+  taxAmount      Int @default(0) // PPN 11%
+  serviceCharge  Int @default(0) // e.g. 5%
+  totalAmount    Int // Final total to be paid
+
+  // WhatsApp (related)
+  whatsappId      String?
+  whatsappContact WhatsAppContact? @relation("OrderWhatsApp", fields: [whatsappId], references: [id])
+  whatsappNumber  String? // Raw number input (backup only)
+
+  // Location
+  tableId String?
+  table   Table?  @relation(fields: [tableId], references: [id])
+
+  // Ownership
+  merchantId String
+  merchant   Merchant @relation(fields: [merchantId], references: [id])
+
+  // Relations
+  items        OrderItem[]
+  images       Image[]       @relation("OrderImages")
+  chatMessages ChatMessage[]
+
+  // Timestamps
+  cancelledAt  DateTime?
+  cancelReason String?
+  cancelledBy  String?
+  confirmedAt  DateTime?
+  preparingAt  DateTime?
+  readyAt      DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@schema("pos_coffee_shop")
+}
+
+model WhatsAppContact {
+  id     String  @id @default(uuid())
+  number String  @unique // Must be normalized (e.g. +628xxxxxxx)
+  name   String? // Optional name (optional but useful)
+
+  // Backlink to orders
+  orders Order[] @relation("OrderWhatsApp")
+
+  createdAt DateTime @default(now())
+
+  @@schema("pos_coffee_shop")
+}
+
+model OrderItem {
+  id      String @id @default(uuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+
+  stallId    String? // 👈 NEW: Tracks which stall fulfills this item
+  stall      Stall?  @relation(fields: [stallId], references: [id])
+  note       String?
+  quantity   Int
+  unitPrice  Int // ✅ snapshot price
+  totalPrice Int // ✅ quantity * unitPrice
+
+  variants OrderItemVariant[] // ✅ relasi ke variant
+
+  @@schema("pos_coffee_shop")
+}
+
+model OrderItemVariant {
+  id          String @id @default(uuid())
+  orderItemId String
+  variantId   String
+
+  orderItem OrderItem   @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  variant   MenuVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([orderItemId, variantId]) // Mencegah duplicate variant di 1 item
+  @@schema("pos_coffee_shop")
+}
+
+model ChatMessage {
+  id        String     @id @default(uuid())
+  orderId   String
+  sender    ChatSender
+  content   String
+  type      ChatType   @default(TEXT)
+  seen      Boolean    @default(false)
+  timestamp DateTime   @default(now())
+  order     Order      @relation(fields: [orderId], references: [id])
+
+  @@schema("pos_coffee_shop")
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  CANCELLED
+  COMPLETED
+
+  @@schema("pos_coffee_shop")
+}
+
+enum ChatSender {
+  CUSTOMER
+  CASHIER
+  SYSTEM
+
+  @@schema("pos_coffee_shop")
+}
+
+enum ChatType {
+  TEXT
+  IMAGE
+  SYSTEM
+
+  @@schema("pos_coffee_shop")
+}
